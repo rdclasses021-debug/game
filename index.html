@@ -1,0 +1,1736 @@
+
+
+<html lang="en"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Word Search Pro - Ultimate</title>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="WordSearchPro">
+    
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%232563eb'%3E%3Ccircle cx='11' cy='11' r='8' fill='none' stroke='%232563eb' stroke-width='2'/%3E%3Cpath d='m21 21-4.3-4.3' stroke='%232563eb' stroke-width='2' stroke-linecap='round'/%3E%3Ctext x='11' y='14' font-family='Arial' font-size='8' font-weight='bold' fill='%232563eb' text-anchor='middle'%3EW%3C/text%3E%3C/svg%3E">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&amp;display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: radial-gradient(circle at top left, #f8fafc, #e2e8f0);
+            touch-action: none;
+            /* Prevent pull-to-refresh on mobile */
+            overscroll-behavior-y: none;
+        }
+
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white !important; }
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .cell {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .cell-selected {
+            background-color: #3b82f6 !important;
+            color: white !important;
+            transform: scale(1.05);
+            z-index: 10;
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+
+        /* Color palettes for found words */
+        .found-bg-0 { background-color: #f87171 !important; }
+        .found-bg-1 { background-color: #fb923c !important; }
+        .found-bg-2 { background-color: #fbbf24 !important; }
+        .found-bg-3 { background-color: #4ade80 !important; }
+        .found-bg-4 { background-color: #22d3ee !important; }
+        .found-bg-5 { background-color: #818cf8 !important; }
+        .found-bg-6 { background-color: #c084fc !important; }
+        .found-bg-7 { background-color: #f472b6 !important; }
+
+        .found-text { color: white !important; }
+
+        .bar-container {
+            display: flex;
+            align-items: flex-end;
+            gap: 4px;
+            height: 100%;
+            padding-bottom: 4px;
+        }
+        
+        .bar-col {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            height: 100%;
+        }
+
+        .bar-fill {
+            width: 100%;
+            border-top-left-radius: 99px;
+            border-top-right-radius: 99px;
+            height: 0;
+            transition: height 1s cubic-bezier(0.34, 1.56, 0.64, 1);
+            opacity: 0.9;
+        }
+
+        .gauge-path { 
+            stroke-dasharray: 283; 
+            stroke-dashoffset: 283;
+            transition: stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .paused-overlay {
+            display: none;
+            position: absolute;
+            inset: 0;
+            background: rgba(255, 255, 255, 0.95);
+            z-index: 50;
+            backdrop-filter: blur(8px);
+            border-radius: 1rem;
+        }
+        .is-paused .paused-overlay { display: flex; }
+        .game-grid { cursor: crosshair; display: grid; gap: 4px; }
+
+        /* Modernized Word List Styles with Animation */
+        .word-item {
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+            overflow: hidden;
+            border: 1px solid #f1f5f9;
+        }
+
+        .word-fill-bg {
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            transition: left 0.5s ease-in-out;
+            z-index: 0;
+        }
+
+        .word-found .word-fill-bg {
+            left: 0;
+        }
+
+        .word-text-content {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+
+        .word-found .word-label {
+            text-decoration: line-through;
+            text-decoration-thickness: 2px;
+            opacity: 0.9;
+        }
+
+        @keyframes pop-in {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        @keyframes fade-up {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
+
+        .anim-fade-up { animation: fade-up 0.5s ease-out forwards; }
+        .anim-shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+        .anim-delay-1 { animation-delay: 0.1s; }
+        .anim-delay-2 { animation-delay: 0.2s; }
+        .anim-delay-3 { animation-delay: 0.3s; }
+
+        .check-anim {
+            animation: pop-in 0.4s forwards;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+        
+        /* Admin Specific */
+        .admin-stat-card {
+            background: rgba(255,255,255,0.8);
+            border: 1px solid rgba(255,255,255,0.6);
+            transition: transform 0.2s;
+        }
+        .admin-stat-card:hover { transform: translateY(-4px); }
+
+        /* Admin Graph Bars */
+        .graph-bar {
+            width: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+        }
+        .graph-fill {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            background: #3b82f6;
+            border-radius: 4px;
+            transition: height 1s ease-out;
+        }
+
+        /* History Tab Specifics */
+        .stat-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1rem;
+            background: white;
+            border-radius: 1rem;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            border: 1px solid #f1f5f9;
+        }
+
+        /* Group Player Card Modern */
+        .player-card {
+            position: relative;
+            background: white;
+            border: 2px solid #e2e8f0;
+            border-radius: 1rem;
+            padding: 1rem;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
+        }
+        .player-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            border-color: #3b82f6;
+        }
+        .player-card.selected {
+            background: #eff6ff;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px #3b82f6;
+        }
+        .player-card .check-icon {
+            display: none;
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            color: #3b82f6;
+        }
+        .player-card.selected .check-icon { display: block; }
+        
+        .timer-opt {
+            transition: all 0.2s;
+        }
+        .timer-opt.selected {
+            background-color: #3b82f6;
+            color: white;
+            border-color: #3b82f6;
+        }
+
+        /* MOBILE RESPONSIVE NAV STYLES */
+        @media (max-width: 640px) {
+            .desktop-actions { display: none !important; }
+            .mobile-bottom-nav { display: flex !important; }
+            .mobile-game-controls { display: flex !important; }
+            .pb-mobile-spacer { padding-bottom: 140px; } /* Space for double bottom bars */
+        }
+        @media (min-width: 641px) {
+            .mobile-bottom-nav { display: none !important; }
+            .mobile-game-controls { display: none !important; }
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-900 overflow-x-hidden pb-mobile-spacer">
+
+    <!-- Navbar -->
+    <nav class="no-print py-4 px-6 flex justify-between items-center glass sticky top-0 z-40 mb-6">
+        <div class="flex items-center gap-3">
+            <div class="bg-blue-600 p-2 rounded-xl text-white shadow-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+            </div>
+            <span class="text-xl font-extrabold tracking-tight text-slate-800">WordSearch<span class="text-blue-600">Pro</span></span>
+        </div>
+        
+        <!-- Desktop Actions (Hidden on Mobile) -->
+        <div class="desktop-actions flex gap-2 items-center">
+            <button onclick="revealWord()" title="Reveal a random word" class="p-2 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 11-13-10"></path><path d="m3 21 13-10"></path><path d="m11 11 5 5"></path><path d="m5 5 10 10"></path><circle cx="5" cy="19" r="2"></circle></svg>
+            </button>
+            <button onclick="giveHint()" title="Get a hint" class="p-2 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"></path><path d="M9 18h6"></path><path d="M10 22h4"></path></svg>
+            </button>
+            <!-- Triggers Pricing Modal -->
+            <button onclick="openPricingModal()" class="p-2 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            </button>
+            <div class="flex gap-1 ml-2">
+                <button onclick="switchTab('play')" id="btn-play" class="px-3 py-2 rounded-lg font-bold transition-all text-blue-600 bg-blue-50">Play</button>
+                <button onclick="switchTab('group')" id="btn-group" class="px-3 py-2 rounded-lg font-bold transition-all text-slate-500 hover:bg-slate-100">Group</button>
+                <button onclick="switchTab('make')" id="btn-make" class="px-3 py-2 rounded-lg font-bold transition-all text-slate-500 hover:bg-slate-100">Maker</button>
+                <button onclick="switchTab('history')" id="btn-history" class="px-3 py-2 rounded-lg font-bold transition-all text-slate-500 hover:bg-slate-100">History</button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mx-auto px-4 max-w-6xl">
+        <div id="view-play" class="tab-content flex flex-col lg:flex-row gap-8 items-start">
+            <div class="w-full lg:w-2/3">
+                <div class="glass p-4 sm:p-6 rounded-3xl shadow-xl border border-white/50">
+                    <div class="flex flex-wrap justify-between items-end mb-6 gap-4">
+                        <div>
+                            <div id="room-badge" class="hidden mb-2 inline-flex items-center gap-2 px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold uppercase tracking-wider">
+                                <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Live Room
+                            </div>
+                            <h2 id="puzzle-title" class="text-2xl sm:text-3xl font-extrabold text-slate-800 uppercase">Classic Random</h2>
+                            <p class="text-slate-500 font-medium">Find all hidden words</p>
+                        </div>
+                        <div class="flex gap-2 desktop-actions">
+                            <!-- New Timer Settings Icon (Desktop) -->
+                            <button onclick="openTimerSettings()" class="bg-slate-100 p-2 rounded-xl text-slate-600 hover:bg-slate-200">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                            </button>
+                            <button id="pause-btn" onclick="togglePause()" class="bg-slate-100 p-2 rounded-xl text-slate-600 hover:bg-slate-200">
+                                <svg id="pause-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                            </button>
+                            <div class="bg-slate-100 px-4 py-2 rounded-2xl flex items-center gap-2">
+                                <span id="timer" class="font-mono font-bold text-lg text-slate-700">00:00</span>
+                            </div>
+                        </div>
+                        <!-- Mobile Timer Display -->
+                        <div class="mobile-game-controls bg-slate-100 px-4 py-2 rounded-2xl flex items-center gap-2 md:hidden">
+                             <span id="timer-mobile" class="font-mono font-bold text-lg text-slate-700">00:00</span>
+                        </div>
+                    </div>
+                    <div id="grid-container" class="relative bg-slate-200/50 p-1 sm:p-2 rounded-2xl overflow-hidden shadow-inner">
+                        <div id="grid" class="game-grid unselectable mx-auto touch-none"></div>
+                        <div class="paused-overlay items-center justify-center flex-col gap-4">
+                            <h3 class="text-2xl font-black text-slate-800">Game Paused</h3>
+                            <button onclick="togglePause()" class="px-8 py-3 bg-blue-600 text-white rounded-2xl font-bold">Resume</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- REFINED WORD LIST SECTION -->
+            <div class="w-full lg:w-1/3 no-print">
+                <div class="glass p-6 rounded-3xl shadow-xl sticky top-24 border border-white/50">
+                    <div class="flex items-center justify-between mb-6 border-b border-slate-100 pb-4">
+                        <div>
+                            <h3 class="text-xl font-extrabold text-slate-800">Word Bank</h3>
+                            <p class="text-xs text-slate-400 font-bold uppercase tracking-wider">Search Progress</p>
+                        </div>
+                        <span id="progress-text" class="text-sm font-black bg-blue-600 text-white px-4 py-1.5 rounded-full shadow-md shadow-blue-200">0/10</span>
+                    </div>
+                    
+                    <div id="word-list" class="grid grid-cols-2 lg:grid-cols-1 gap-2 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                        <!-- Words Generated Here -->
+                    </div>
+
+                    <div class="mt-8 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                        <div class="flex items-center gap-3 text-slate-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
+                            <p class="text-[11px] font-semibold leading-tight">Drag through letters to select a word. Words can be horizontal, vertical, or diagonal.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODERN GROUP PLAYER VIEW -->
+        <div id="view-group" class="tab-content hidden max-w-4xl mx-auto space-y-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- Left: Create Room -->
+                <div class="glass p-8 rounded-3xl shadow-xl border border-white/50 flex flex-col h-full">
+                    <div class="flex items-center gap-4 mb-6">
+                        <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                        </div>
+                        <div>
+                            <h2 class="text-2xl font-black text-slate-800">Create Lobby</h2>
+                            <p class="text-xs font-bold text-slate-400 uppercase tracking-widest">Host a Game</p>
+                        </div>
+                    </div>
+
+                    <div class="flex-1">
+                        <label class="block text-sm font-bold text-slate-600 mb-4">Select Number of Players</label>
+                        <div class="grid grid-cols-2 gap-3 mb-8">
+                            <div onclick="selectPlayerCount(2)" class="player-card selected" id="p-2">
+                                <div class="check-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+                                <div class="flex items-center gap-2 mb-2">
+                                    <div class="flex -space-x-2">
+                                        <div class="w-6 h-6 rounded-full bg-slate-200 border-2 border-white"></div>
+                                        <div class="w-6 h-6 rounded-full bg-slate-300 border-2 border-white"></div>
+                                    </div>
+                                    <span class="text-sm font-bold text-slate-700">2 Players</span>
+                                </div>
+                                <p class="text-[10px] text-slate-400 leading-tight">Head to head duel.</p>
+                            </div>
+                            <div onclick="selectPlayerCount(3)" class="player-card" id="p-3">
+                                <div class="check-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+                                <div class="flex items-center gap-2 mb-2">
+                                    <div class="flex -space-x-2">
+                                        <div class="w-6 h-6 rounded-full bg-slate-200 border-2 border-white"></div>
+                                        <div class="w-6 h-6 rounded-full bg-slate-300 border-2 border-white"></div>
+                                        <div class="w-6 h-6 rounded-full bg-slate-400 border-2 border-white"></div>
+                                    </div>
+                                    <span class="text-sm font-bold text-slate-700">3 Players</span>
+                                </div>
+                                <p class="text-[10px] text-slate-400 leading-tight">Triple threat match.</p>
+                            </div>
+                            <div onclick="selectPlayerCount(4)" class="player-card" id="p-4">
+                                <div class="check-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="w-6 h-6 flex items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-600">4</span>
+                                    <span class="text-sm font-bold text-slate-700">4 Players</span>
+                                </div>
+                                <p class="text-[10px] text-slate-400 leading-tight">Squad battle.</p>
+                            </div>
+                            <div onclick="selectPlayerCount(5)" class="player-card" id="p-5">
+                                <div class="check-icon"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="w-6 h-6 flex items-center justify-center rounded-full bg-indigo-100 text-[10px] font-bold text-indigo-600">5</span>
+                                    <span class="text-sm font-bold text-slate-700">5 Players</span>
+                                </div>
+                                <p class="text-[10px] text-slate-400 leading-tight">Full party mode.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onclick="generateGroupLink()" class="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2">
+                        <span>Generate Invite Link</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                    </button>
+
+                    <!-- Generated Link Area -->
+                    <div id="link-area" class="hidden mt-6 pt-6 border-t border-slate-100 animate-fade-up">
+                        <p class="text-xs font-bold text-slate-500 mb-2 uppercase">Share this link</p>
+                        <div class="bg-slate-50 border border-slate-200 p-2 pl-4 rounded-xl flex gap-2 items-center">
+                            <input type="text" id="share-url" readonly class="w-full bg-transparent outline-none text-slate-600 text-xs font-medium font-mono truncate">
+                            <button onclick="copyLink()" class="p-2.5 bg-white text-blue-600 rounded-lg shadow-sm border border-slate-100 hover:bg-blue-50 transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            </button>
+                        </div>
+                        <p class="text-center text-[10px] text-green-600 font-bold mt-2 h-4" id="copy-feedback"></p>
+                    </div>
+                </div>
+
+                <!-- Right: Join Room -->
+                <div class="glass p-8 rounded-3xl shadow-xl border border-white/50 flex flex-col justify-center">
+                    <div class="text-center">
+                        <div class="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 mx-auto mb-4">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                        </div>
+                        <h2 class="text-2xl font-black text-slate-800">Join a Room</h2>
+                        <p class="text-sm font-medium text-slate-500 mt-1 mb-6">Have a room code? Enter it below.</p>
+                        
+                        <div class="max-w-xs mx-auto space-y-3">
+                            <input type="text" id="manual-room-code" placeholder="Enter Room Code" class="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-center font-mono font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500">
+                            <button onclick="joinManualRoom()" class="w-full py-3 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-900 transition-colors">Join Game</button>
+                        </div>
+
+                        <!-- How to Join Instructions -->
+                        <div class="mt-8 pt-6 border-t border-slate-100 text-left">
+                            <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 text-center">How to Join</h4>
+                            <div class="space-y-3">
+                                <div class="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                    <span class="w-6 h-6 rounded-full bg-white border border-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">1</span>
+                                    <p class="text-xs text-slate-500 font-medium">Ask your friend for the <strong>Room Code</strong> or Link.</p>
+                                </div>
+                                <div class="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                    <span class="w-6 h-6 rounded-full bg-white border border-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">2</span>
+                                    <p class="text-xs text-slate-500 font-medium">Enter the code in the box above.</p>
+                                </div>
+                                <div class="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                    <span class="w-6 h-6 rounded-full bg-white border border-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">3</span>
+                                    <p class="text-xs text-slate-500 font-medium">Click <strong>Join Game</strong> to sync instantly!</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- New "How it Works" Section -->
+            <div class="glass mt-8 p-8 rounded-3xl shadow-xl border border-white/50">
+                <h3 class="text-xl font-black text-slate-800 mb-8 text-center uppercase tracking-widest">How Group Play Works</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <!-- Step 1 -->
+                    <div class="flex flex-col items-center text-center">
+                        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white shadow-lg mb-4">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                        </div>
+                        <h4 class="text-lg font-bold text-slate-800 mb-2">1. Host & Customize</h4>
+                        <p class="text-sm text-slate-500 leading-relaxed font-medium">Create a lobby and select the number of players. A unique game seed is generated.</p>
+                    </div>
+                    
+                    <!-- Step 2 -->
+                    <div class="flex flex-col items-center text-center relative">
+                        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-white shadow-lg mb-4">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                        </div>
+                        <h4 class="text-lg font-bold text-slate-800 mb-2">2. Share the Link</h4>
+                        <p class="text-sm text-slate-500 leading-relaxed font-medium">Send the invite link to your friends. They can join instantly without an account.</p>
+                    </div>
+
+                    <!-- Step 3 -->
+                    <div class="flex flex-col items-center text-center">
+                        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center text-white shadow-lg mb-4">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
+                        </div>
+                        <h4 class="text-lg font-bold text-slate-800 mb-2">3. Race to Win</h4>
+                        <p class="text-sm text-slate-500 leading-relaxed font-medium">Everyone gets the <strong>exact same board</strong>. Find all words first to claim victory!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MAKER VIEW -->
+        <div id="view-make" class="tab-content hidden max-w-2xl mx-auto space-y-8">
+            <div class="glass p-8 sm:p-10 rounded-3xl shadow-2xl border border-white/50">
+                <h2 class="text-3xl font-extrabold text-slate-800 mb-6 text-center">Puzzle Maker</h2>
+                <div class="space-y-6">
+                    <input type="text" id="maker-title" placeholder="Puzzle Title (e.g. Space, Fruits)" class="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                    <div>
+                        <textarea id="maker-words" rows="5" oninput="validateWordLimit(this)" placeholder="Enter words (one per line)..." class="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-mono focus:ring-2 focus:ring-blue-500 outline-none transition-all"></textarea>
+                        <p id="word-count-helper" class="text-right text-xs font-bold text-slate-400 mt-2 px-2">MAX 12 WORDS</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <select id="maker-size" class="px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-bold cursor-pointer">
+                            <option value="10">10x10 (Easy)</option>
+                            <option value="12" selected="">12x12 (Medium)</option>
+                            <option value="15">15x15 (Hard)</option>
+                        </select>
+                        <button onclick="generateCustomPuzzle()" class="bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 active:scale-95 transition-all">Create Puzzle</button>
+                    </div>
+                </div>
+
+                <!-- New: How to Use Maker -->
+                <div class="mt-8 pt-8 border-t border-slate-200">
+                    <h3 class="text-lg font-black text-slate-800 mb-6 text-center uppercase tracking-widest">How to Create</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="bg-orange-50 p-4 rounded-2xl border border-orange-100 flex flex-col items-center text-center">
+                            <div class="w-10 h-10 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center mb-2 font-bold">1</div>
+                            <span class="text-sm font-bold text-slate-700">Enter Words</span>
+                            <p class="text-[10px] text-slate-500 mt-1">Type your word list, one per line.</p>
+                        </div>
+                        <div class="bg-pink-50 p-4 rounded-2xl border border-pink-100 flex flex-col items-center text-center">
+                            <div class="w-10 h-10 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center mb-2 font-bold">2</div>
+                            <span class="text-sm font-bold text-slate-700">Choose Size</span>
+                            <p class="text-[10px] text-slate-500 mt-1">Pick grid size (10x10 to 15x15).</p>
+                        </div>
+                        <div class="bg-purple-50 p-4 rounded-2xl border border-purple-100 flex flex-col items-center text-center">
+                            <div class="w-10 h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center mb-2 font-bold">3</div>
+                            <span class="text-sm font-bold text-slate-700">Play & Print</span>
+                            <p class="text-[10px] text-slate-500 mt-1">Instant play or print for offline.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- HISTORY VIEW -->
+        <div id="view-history" class="tab-content hidden max-w-4xl mx-auto space-y-8">
+            <div class="glass p-8 sm:p-10 rounded-3xl shadow-2xl border border-white/50">
+                <div class="flex justify-between items-center mb-8">
+                    <h2 class="text-3xl font-extrabold text-slate-800">Your Performance</h2>
+                    <button onclick="clearHistory()" class="text-xs font-bold text-red-500 hover:text-red-600 uppercase tracking-widest bg-red-50 px-3 py-2 rounded-lg">Clear History</button>
+                </div>
+                
+                <!-- Stat Cards -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+                    <div class="stat-badge">
+                        <div class="bg-blue-100 p-2 rounded-lg text-blue-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                        </div>
+                        <div>
+                            <p class="text-xs text-slate-400 font-bold uppercase">Games Played</p>
+                            <p id="hist-total-games" class="text-xl font-black text-slate-800">0</p>
+                        </div>
+                    </div>
+                    <div class="stat-badge">
+                        <div class="bg-green-100 p-2 rounded-lg text-green-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 11-13-10"></path><path d="m3 21 13-10"></path><path d="m11 11 5 5"></path><path d="m5 5 10 10"></path><circle cx="5" cy="19" r="2"></circle></svg>
+                        </div>
+                        <div>
+                            <p class="text-xs text-slate-400 font-bold uppercase">Words Found</p>
+                            <p id="hist-total-words" class="text-xl font-black text-slate-800">0</p>
+                        </div>
+                    </div>
+                    <div class="stat-badge">
+                        <div class="bg-amber-100 p-2 rounded-lg text-amber-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                        </div>
+                        <div>
+                            <p class="text-xs text-slate-400 font-bold uppercase">Best Time</p>
+                            <p id="hist-best-time" class="text-xl font-black text-slate-800">-</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- History Table -->
+                <div class="overflow-x-auto rounded-2xl border border-slate-100">
+                    <table class="w-full text-left text-sm text-slate-600">
+                        <thead class="bg-slate-50 text-xs uppercase font-bold text-slate-400">
+                            <tr>
+                                <th class="px-6 py-4">Date</th>
+                                <th class="px-6 py-4">Puzzle</th>
+                                <th class="px-6 py-4">Time</th>
+                                <th class="px-6 py-4">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body" class="bg-white divide-y divide-slate-100">
+                            <tr>
+                                <td colspan="4" class="px-6 py-8 text-center text-slate-400 italic">No games played yet.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- FIXED MOBILE GAME CONTROLS (FLOAT ABOVE NAV) -->
+    <div id="game-controls-mobile" class="mobile-game-controls fixed bottom-[80px] left-4 right-4 bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-xl border border-slate-200 z-50 justify-between items-center gap-2 animate-fade-up">
+        <button onclick="revealWord()" class="flex-1 p-3 bg-indigo-50 text-indigo-600 rounded-xl font-bold text-xs flex flex-col items-center gap-1 active:scale-95 transition-transform">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 11-13-10"></path><path d="m3 21 13-10"></path><path d="m11 11 5 5"></path><path d="m5 5 10 10"></path><circle cx="5" cy="19" r="2"></circle></svg>
+            Reveal
+        </button>
+        <button onclick="giveHint()" class="flex-1 p-3 bg-amber-50 text-amber-600 rounded-xl font-bold text-xs flex flex-col items-center gap-1 active:scale-95 transition-transform">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"></path><path d="M9 18h6"></path><path d="M10 22h4"></path></svg>
+            Hint
+        </button>
+        <button onclick="togglePause()" class="flex-1 p-3 bg-slate-50 text-slate-600 rounded-xl font-bold text-xs flex flex-col items-center gap-1 active:scale-95 transition-transform">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+            Pause
+        </button>
+        <button onclick="openTimerSettings()" class="flex-1 p-3 bg-blue-50 text-blue-600 rounded-xl font-bold text-xs flex flex-col items-center gap-1 active:scale-95 transition-transform">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            Timer
+        </button>
+    </div>
+
+    <!-- FIXED BOTTOM NAV (MOBILE) -->
+    <nav class="mobile-bottom-nav fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-2 z-50 justify-around items-center pb-safe">
+        <button onclick="switchTab('play')" id="mb-play" class="flex flex-col items-center p-2 rounded-xl text-blue-600">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            <span class="text-[10px] font-bold mt-1">Play</span>
+        </button>
+        <button onclick="switchTab('group')" id="mb-group" class="flex flex-col items-center p-2 rounded-xl text-slate-400 hover:text-slate-600">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            <span class="text-[10px] font-bold mt-1">Group</span>
+        </button>
+        <button onclick="switchTab('make')" id="mb-make" class="flex flex-col items-center p-2 rounded-xl text-slate-400 hover:text-slate-600">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            <span class="text-[10px] font-bold mt-1">Maker</span>
+        </button>
+        <button onclick="switchTab('history')" id="mb-history" class="flex flex-col items-center p-2 rounded-xl text-slate-400 hover:text-slate-600">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            <span class="text-[10px] font-bold mt-1">History</span>
+        </button>
+    </nav>
+
+    <!-- NEW: TIMER SETTINGS MODAL -->
+    <div id="timer-settings-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-white p-6 rounded-[2rem] shadow-2xl max-w-sm w-full transform transition-all">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-black text-slate-800">Timer Settings</h3>
+                <button onclick="closeTimerSettings()" class="p-2 hover:bg-slate-100 rounded-full text-slate-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            
+            <div class="space-y-3">
+                <button onclick="setTimerOption(0)" class="timer-opt w-full py-4 px-6 rounded-xl border-2 border-slate-100 font-bold text-slate-600 flex justify-between items-center selected" id="t-0">
+                    <span>Unlimited (Count Up)</span>
+                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </button>
+                <button onclick="setTimerOption(3)" class="timer-opt w-full py-4 px-6 rounded-xl border-2 border-slate-100 font-bold text-slate-600 flex justify-between items-center" id="t-3">
+                    <span>3 Minutes</span>
+                    <span class="text-xs bg-slate-100 px-2 py-1 rounded">Blitz</span>
+                </button>
+                <button onclick="setTimerOption(5)" class="timer-opt w-full py-4 px-6 rounded-xl border-2 border-slate-100 font-bold text-slate-600 flex justify-between items-center" id="t-5">
+                    <span>5 Minutes</span>
+                    <span class="text-xs bg-slate-100 px-2 py-1 rounded">Normal</span>
+                </button>
+                <button onclick="setTimerOption(10)" class="timer-opt w-full py-4 px-6 rounded-xl border-2 border-slate-100 font-bold text-slate-600 flex justify-between items-center" id="t-10">
+                    <span>10 Minutes</span>
+                    <span class="text-xs bg-slate-100 px-2 py-1 rounded">Relaxed</span>
+                </button>
+            </div>
+            
+            <button onclick="applyTimerSettings()" class="mt-6 w-full py-3 bg-blue-600 text-white rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-all">Apply & Restart</button>
+        </div>
+    </div>
+
+    <!-- NEW: GAME OVER / LOOSER MODAL -->
+    <div id="game-over-modal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md flex items-center justify-center hidden z-[55] p-4">
+        <div class="bg-white p-8 rounded-[2.5rem] shadow-2xl max-w-sm w-full transform transition-all text-center anim-shake">
+            <div class="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg class="text-red-500 w-10 h-10" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
+            <h2 class="text-3xl font-black text-slate-800 mb-2">Time's Up!</h2>
+            <p class="text-slate-500 font-medium mb-8">You ran out of time. Don't give up!</p>
+            <button onclick="resetGame(); document.getElementById('game-over-modal').classList.add('hidden');" class="w-full py-4 bg-red-500 text-white rounded-2xl font-bold shadow-lg shadow-red-200 hover:bg-red-600 transition-all">
+                Try Again
+            </button>
+        </div>
+    </div>
+
+    <!-- Progress Report Modal (WINNER) -->
+    <div id="report-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md flex items-center justify-center hidden z-50 p-4">
+        <div class="bg-white p-6 sm:p-8 rounded-[2.5rem] shadow-2xl max-w-2xl w-full transform transition-all">
+            <h2 class="text-2xl font-black text-center text-slate-800 uppercase mb-8 tracking-tighter">Mission Accomplished!</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                <!-- UPDATED EFFICIENCY GRAPH -->
+                <div class="bg-slate-50 p-6 rounded-3xl">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase mb-4 tracking-widest text-center">Efficiency Graph</h3>
+                    <div class="h-32 px-2 relative">
+                        <div id="bar-chart-container" class="bar-container w-full"></div>
+                    </div>
+                    <!-- START / END LABELS -->
+                    <div class="flex justify-between w-full mt-2 px-1">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Start</span>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">End</span>
+                    </div>
+                    <div class="text-center mt-4 text-sm font-bold text-slate-600">You found <span id="report-word-count" class="text-blue-600">0</span> words</div>
+                </div>
+
+                <div class="bg-slate-50 p-6 rounded-3xl flex flex-col items-center justify-center">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase mb-2 tracking-widest">Time Speed</h3>
+                    <div class="relative w-32 h-32">
+                        <svg class="w-full h-full transform -rotate-90">
+                            <circle cx="64" cy="64" r="45" stroke="currentColor" stroke-width="8" fill="transparent" class="text-slate-200"></circle>
+                            <circle id="gauge-progress" cx="64" cy="64" r="45" stroke="currentColor" stroke-width="8" fill="transparent" stroke-linecap="round" class="text-blue-600 gauge-path" style="--offset: 283;"></circle>
+                        </svg>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center">
+                            <span id="report-time" class="text-xl font-black text-slate-800">00:00</span>
+                            <span class="text-[10px] font-bold text-slate-400 uppercase">Clear Time</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="report-actions" class="text-center">
+                <div id="countdown-area">
+                    <p class="text-slate-400 font-bold text-xs mb-2 uppercase">Ready for next?</p>
+                    <div id="countdown-circle" class="text-3xl font-black text-blue-600">5</div>
+                </div>
+                <div id="action-buttons" class="hidden flex flex-col sm:flex-row gap-3 pt-2">
+                    <button onclick="resetGame(); closeModal();" class="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg hover:bg-blue-700 transition-colors">Play Next Level</button>
+                    <button onclick="resetGame(); closeModal();" class="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-colors">Try Again</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODERN PRICING DASHBOARD -->
+    <div id="pricing-modal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-xl flex items-center justify-center hidden z-[60] p-4 overflow-y-auto">
+        <div class="relative bg-white rounded-[2.5rem] shadow-2xl max-w-5xl w-full overflow-hidden flex flex-col md:flex-row min-h-[600px] anim-fade-up">
+            
+            <button onclick="closePricingModal()" class="absolute top-6 right-6 z-20 p-2 bg-white/50 hover:bg-white rounded-full transition-colors text-slate-500">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+
+            <!-- LEFT COLUMN: Features & How To -->
+            <div class="w-full md:w-3/5 p-8 md:p-12 bg-slate-50 flex flex-col justify-between relative overflow-hidden">
+                <!-- Decoration -->
+                <div class="absolute -top-24 -left-24 w-64 h-64 bg-blue-100 rounded-full blur-3xl opacity-60 pointer-events-none"></div>
+                <div class="absolute top-1/2 right-12 w-32 h-32 bg-indigo-100 rounded-full blur-2xl opacity-60 pointer-events-none"></div>
+
+                <div class="relative z-10">
+                    <span class="inline-block px-4 py-1.5 rounded-full bg-blue-100 text-blue-700 text-xs font-black uppercase tracking-widest mb-6">Premium Access</span>
+                    <h2 class="text-4xl md:text-5xl font-black text-slate-800 mb-6 leading-tight">Own the <br><span class="text-blue-600">Source Code</span></h2>
+                    
+                    <div class="grid grid-cols-1 gap-6 mb-10">
+                        <div class="flex items-start gap-4 anim-fade-up anim-delay-1">
+                            <div class="w-12 h-12 rounded-2xl bg-white shadow-md flex items-center justify-center text-blue-600 flex-shrink-0">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></svg>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-lg text-slate-800">Single HTML File</h3>
+                                <p class="text-sm text-slate-500 font-medium">No build process. No dependencies. Just one file to rule them all.</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-4 anim-fade-up anim-delay-2">
+                            <div class="w-12 h-12 rounded-2xl bg-white shadow-md flex items-center justify-center text-indigo-600 flex-shrink-0">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-lg text-slate-800">Fully Customizable</h3>
+                                <p class="text-sm text-slate-500 font-medium">Edit colors, words, and logic easily. Perfect for learning or reskinning.</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-4 anim-fade-up anim-delay-3">
+                            <div class="w-12 h-12 rounded-2xl bg-white shadow-md flex items-center justify-center text-amber-500 flex-shrink-0">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-lg text-slate-800">Offline & Resell</h3>
+                                <p class="text-sm text-slate-500 font-medium">Use it without internet. You get full rights to use this code.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- How to Download Guide -->
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 relative z-10">
+                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">How to Install</h4>
+                    <div class="flex items-center gap-4 text-xs font-semibold text-slate-600">
+                        <div class="flex items-center gap-2">
+                            <span class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-800">1</span>
+                            <span>Download</span>
+                        </div>
+                        <div class="w-8 h-px bg-slate-200"></div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-800">2</span>
+                            <span>Save .html</span>
+                        </div>
+                        <div class="w-8 h-px bg-slate-200"></div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-800">3</span>
+                            <span>Open in Browser</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN: Payment & Action -->
+            <div class="w-full md:w-2/5 bg-white p-8 md:p-12 flex flex-col justify-center border-l border-slate-100">
+                <div class="text-center mb-8">
+                    <p class="text-sm font-bold text-slate-400 uppercase mb-2">Total One-Time Price</p>
+                    <div class="flex items-baseline justify-center gap-2">
+                        <span class="text-6xl font-black text-slate-900 tracking-tight" id="display-price">₹499</span>
+                        <span class="text-lg font-bold text-slate-300 line-through">₹999</span>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-2 font-medium">Secure Payment via <span id="payment-method-text">INR</span></p>
+                </div>
+
+                <div class="space-y-4 max-w-xs mx-auto w-full">
+                    <!-- Coupon Section -->
+                    <div class="relative group">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg class="h-5 w-5 text-slate-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.91 8.84 8.56 2.23a1.93 1.93 0 0 0-1.81 0l-3.1 1.7a2.1 2.1 0 0 0-.97 1.93l.29 8.59a1.81 1.81 0 0 0 1.23 1.6l8.06 2.82a1.88 1.88 0 0 0 1.77-.07l6.81-4.07a2.12 2.12 0 0 0 1.07-1.92l-.1-3.9a2.09 2.09 0 0 0-.8-1.74z"/></svg>
+                        </div>
+                        <input type="text" id="coupon-input" class="w-full pl-10 pr-24 py-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all font-bold text-slate-700 placeholder-slate-400 text-sm" placeholder="HAVE A CODE?">
+                        <button onclick="applyCoupon()" class="absolute right-2 top-2 bottom-2 px-4 bg-slate-800 text-white rounded-lg text-xs font-bold hover:bg-slate-700 transition-colors">APPLY</button>
+                    </div>
+                    <div id="coupon-feedback" class="h-4 text-center text-xs font-bold"></div>
+
+                    <!-- Payment Button -->
+                    <button onclick="processTransaction()" id="main-action-btn" class="w-full py-5 bg-blue-600 text-white rounded-2xl font-bold shadow-xl shadow-blue-200 hover:bg-blue-700 hover:shadow-2xl hover:-translate-y-1 transform active:scale-95 transition-all flex items-center justify-center gap-3">
+                        <span id="btn-text">Pay Now</span>
+                        <svg id="btn-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+                    </button>
+
+                    <p class="text-[10px] text-center text-slate-400 mt-4 leading-relaxed">
+                        By clicking above, you agree to our Terms of Service. <br> Instant download starts after payment validation.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECRET ADMIN DASHBOARD -->
+    <div id="admin-dashboard" class="fixed inset-0 bg-slate-100 z-[70] hidden overflow-y-auto">
+        <nav class="bg-slate-900 text-white p-4 sticky top-0 z-50 shadow-lg">
+            <div class="container mx-auto max-w-6xl flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <div class="bg-blue-600 p-1.5 rounded-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+                    </div>
+                    <span class="font-bold text-lg tracking-tight">Admin<span class="text-blue-400">Panel</span></span>
+                </div>
+                <button onclick="closeAdmin()" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg text-xs font-bold transition-colors">Logout</button>
+            </div>
+        </nav>
+
+        <main class="container mx-auto max-w-6xl p-6 md:p-8 space-y-8">
+            <!-- Stats Row -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Revenue Card with Graph -->
+                <div class="admin-stat-card p-6 rounded-2xl shadow-sm bg-white relative overflow-hidden">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <div class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Total Revenue</div>
+                            <div class="text-3xl font-black text-slate-800">₹12,450</div>
+                            <div class="text-green-500 text-xs font-bold mt-2">+12% this week</div>
+                        </div>
+                    </div>
+                    <!-- CSS Bar Graph -->
+                    <div class="flex items-end gap-2 h-16 w-full">
+                         <div class="graph-bar h-full w-full"><div class="graph-fill" style="height: 40%"></div></div>
+                         <div class="graph-bar h-full w-full"><div class="graph-fill" style="height: 70%"></div></div>
+                         <div class="graph-bar h-full w-full"><div class="graph-fill" style="height: 50%"></div></div>
+                         <div class="graph-bar h-full w-full"><div class="graph-fill" style="height: 90%"></div></div>
+                         <div class="graph-bar h-full w-full"><div class="graph-fill" style="height: 30%"></div></div>
+                         <div class="graph-bar h-full w-full"><div class="graph-fill" style="height: 80%"></div></div>
+                         <div class="graph-bar h-full w-full"><div class="graph-fill" style="height: 60%"></div></div>
+                    </div>
+                </div>
+
+                <div class="admin-stat-card p-6 rounded-2xl shadow-sm bg-white">
+                    <div class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Active Games</div>
+                    <div class="text-3xl font-black text-slate-800">842</div>
+                    <div class="text-blue-500 text-xs font-bold mt-2">Live Now</div>
+                </div>
+                <div class="admin-stat-card p-6 rounded-2xl shadow-sm bg-white">
+                    <div class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2">Downloads</div>
+                    <div class="text-3xl font-black text-slate-800">1,205</div>
+                    <div class="text-slate-400 text-xs font-bold mt-2">All time</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- Payment Config Card -->
+                <div class="bg-white p-8 rounded-3xl shadow-lg border border-slate-100">
+                    <h3 class="text-xl font-black text-slate-800 mb-6 flex items-center gap-2">
+                        <svg class="text-green-600" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+                        Payment Gateway Config
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Gateway Name (Displayed to User)</label>
+                            <input type="text" id="admin-gateway-name" placeholder="e.g. Razorpay, PayPal" value="INR" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Wallet ID / API Key</label>
+                            <input type="text" id="admin-gateway-key" placeholder="Enter API Key or Wallet Address" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm">
+                        </div>
+                        <button onclick="updatePaymentConfig()" class="w-full py-3 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-900 transition-colors">
+                            Update Gateway
+                        </button>
+                        <p id="gateway-feedback" class="text-center text-xs font-bold h-4 text-green-500"></p>
+                    </div>
+                </div>
+
+                <!-- Admin Security Settings -->
+                <div class="bg-white p-8 rounded-3xl shadow-lg border border-slate-100">
+                    <h3 class="text-xl font-black text-slate-800 mb-6 flex items-center gap-2">
+                        <svg class="text-red-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                        Security Settings
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Change Admin Password</label>
+                            <input type="text" id="admin-new-pass" placeholder="New Secret Code" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                        <button onclick="updateAdminPassword()" class="w-full py-3 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-900 transition-colors">
+                            Update Password
+                        </button>
+                        <p id="pass-feedback" class="text-center text-xs font-bold h-4 text-green-500"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Game Controls -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="bg-white p-8 rounded-3xl shadow-lg border border-slate-100">
+                    <h3 class="text-xl font-black text-slate-800 mb-6 flex items-center gap-2">
+                        <svg class="text-blue-600" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                        Game Cheats
+                    </h3>
+                    <div class="space-y-4">
+                        <button onclick="adminInstantWin()" class="w-full py-4 bg-gradient-to-r from-green-400 to-green-600 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all transform active:scale-95">
+                            ⚡ Instant Win (Finish Game)
+                        </button>
+                        <button onclick="adminRevealAll()" class="w-full py-4 bg-indigo-50 text-indigo-600 rounded-xl font-bold hover:bg-indigo-100 transition-all">
+                            👁️ Reveal All Words
+                        </button>
+                        <button onclick="resetGame(); closeAdmin();" class="w-full py-4 bg-slate-50 text-slate-600 rounded-xl font-bold hover:bg-slate-100 transition-all">
+                            🔄 Force Reset Game
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-white p-8 rounded-3xl shadow-lg border border-slate-100">
+                    <h3 class="text-xl font-black text-slate-800 mb-6 flex items-center gap-2">
+                        <svg class="text-purple-600" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        System Actions
+                    </h3>
+                    <div class="space-y-4">
+                         <div class="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                            <label class="text-xs font-bold text-slate-500 uppercase block mb-2">Price Override</label>
+                            <input type="text" value="₹0 (Admin Mode)" disabled class="w-full bg-white px-4 py-2 rounded-lg border border-slate-200 text-slate-400 font-mono text-sm">
+                        </div>
+                        <button onclick="executeDownload()" class="w-full py-4 bg-slate-800 text-white rounded-xl font-bold shadow-lg hover:bg-slate-900 transition-all">
+                            💾 Force Download Source
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="text-center text-slate-400 text-xs font-mono">
+                Admin Session ID: #8829-AFX-22 • Secure Connection
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const WORD_POOL = ["GALAXY", "ROCKET", "COMET", "STARS", "PLANET", "NEBULA", "PIZZA", "BURGER", "PASTA", "SUSHI", "APPLE", "BANANA", "CHERRY", "ORANGE", "CODING", "LAPTOP", "CHESS", "GUITAR"];
+        let currentWords = [], foundWords = [], gridSize = 12, grid = [], wordPlacements = [], isSelecting = false, isPaused = false, startCell = null, timerInterval, seconds = 0;
+
+        // --- NEW TIMER LOGIC ---
+        let timeLimit = 0; // 0 = unlimited, >0 = seconds limit
+        let isCountdown = false;
+        let selectedTimerOpt = 0;
+
+        // --- PRICING LOGIC ---
+        let price = 499;
+        const SECRET_COUPON = "CODE100";
+        let ADMIN_CODE = "San123"; // Editable via Admin Panel
+        let PAYMENT_GATEWAY = "INR"; // Editable via Admin Panel
+        let GATEWAY_KEY = ""; // Stored but not currently used in dummy transaction
+
+        // --- HISTORY DATA ---
+        let userHistory = JSON.parse(localStorage.getItem('wordSearchHistory')) || [];
+
+        // --- MULTIPLAYER LOGIC (SEEDED RNG) ---
+        let currentSeed = Date.now(); // Default random
+        let isMultiplayer = false;
+
+        function seededRandom() {
+            const x = Math.sin(currentSeed++) * 10000;
+            return x - Math.floor(x);
+        }
+
+        // Custom Random Wrapper to switch between Math.random and Seeded
+        function myRandom() {
+            return isMultiplayer ? seededRandom() : Math.random();
+        }
+
+        function init() { 
+            checkUrlForRoom(); // Check if joining a group
+            currentWords = getRandomWords(10); 
+            createGrid(); 
+            startTimer(); 
+            initHistory();
+        }
+
+        function checkUrlForRoom() {
+            const params = new URLSearchParams(window.location.search);
+            const room = params.get('room');
+            if (room) {
+                currentSeed = parseInt(room); // Set seed from URL
+                isMultiplayer = true;
+                // Update UI to show we are in a room
+                document.getElementById('room-badge').classList.remove('hidden');
+                document.getElementById('puzzle-title').innerText = "Group Challenge";
+            }
+        }
+
+        function startTimer(resume = false) {
+            if (!resume) {
+                // Initialize based on mode
+                if (timeLimit > 0) {
+                    seconds = timeLimit;
+                    isCountdown = true;
+                } else {
+                    seconds = 0;
+                    isCountdown = false;
+                }
+            }
+            
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => { 
+                if (isCountdown) {
+                    seconds--;
+                    if (seconds <= 0) {
+                        clearInterval(timerInterval);
+                        showGameOver(); // TRIGGER LOOSER MODAL
+                    }
+                } else {
+                    seconds++; 
+                }
+                updateTimerDisplay(); 
+            }, 1000);
+            updateTimerDisplay();
+        }
+
+        function updateTimerDisplay() {
+            // Update Desktop
+            const el = document.getElementById('timer');
+            // Update Mobile
+            const elMobile = document.getElementById('timer-mobile');
+            
+            const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
+            const secs = (seconds % 60).toString().padStart(2, '0');
+            const timeString = `${mins}:${secs}`;
+
+            if (el) {
+                el.innerText = timeString;
+                if (isCountdown && seconds < 10) el.classList.add('text-red-500');
+                else el.classList.remove('text-red-500');
+            }
+            
+            if (elMobile) {
+                elMobile.innerText = timeString;
+                if (isCountdown && seconds < 10) elMobile.classList.add('text-red-500');
+                else elMobile.classList.remove('text-red-500');
+            }
+        }
+
+        function showGameOver() {
+            playSound('fail');
+            document.getElementById('game-over-modal').classList.remove('hidden');
+        }
+
+        // --- TIMER SETTINGS FUNCTIONS ---
+        function openTimerSettings() {
+            document.getElementById('timer-settings-modal').classList.remove('hidden');
+        }
+        function closeTimerSettings() {
+            document.getElementById('timer-settings-modal').classList.add('hidden');
+        }
+        function setTimerOption(mins) {
+            selectedTimerOpt = mins;
+            // Update UI selection
+            document.querySelectorAll('.timer-opt').forEach(el => el.classList.remove('selected'));
+            document.getElementById(`t-${mins}`).classList.add('selected');
+        }
+        function applyTimerSettings() {
+            if (selectedTimerOpt === 0) {
+                timeLimit = 0;
+            } else {
+                timeLimit = selectedTimerOpt * 60;
+            }
+            closeTimerSettings();
+            resetGame(); // Restart with new settings
+        }
+
+        function createGrid() {
+            const gridEl = document.getElementById('grid');
+            gridEl.innerHTML = '';
+            gridEl.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
+            grid = Array(gridSize).fill().map(() => Array(gridSize).fill(''));
+            wordPlacements = [];
+
+            const sortedWords = [...currentWords].sort((a, b) => b.length - a.length);
+
+            sortedWords.forEach(word => {
+                let placed = false, attempts = 0;
+                while (!placed && attempts < 200) {
+                    const dirs = [[0,1],[1,0],[1,1],[0,-1],[-1,0],[-1,-1], [1,-1], [-1,1]];
+                    const [dr, dc] = dirs[Math.floor(myRandom() * dirs.length)];
+                    const r = Math.floor(myRandom() * gridSize), c = Math.floor(myRandom() * gridSize);
+                    if (canPlace(word, r, c, dr, dc)) {
+                        for(let i=0; i<word.length; i++) grid[r+i*dr][c+i*dc] = word[i];
+                        wordPlacements.push({word, r, c, dr, dc});
+                        placed = true;
+                    }
+                    attempts++;
+                }
+            });
+
+            for (let r = 0; r < gridSize; r++) {
+                for (let c = 0; c < gridSize; c++) {
+                    if (!grid[r][c]) grid[r][c] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"[Math.floor(myRandom()*26)];
+                    const cell = document.createElement('div');
+                    cell.className = 'cell aspect-square flex items-center justify-center font-bold text-xs sm:text-sm md:text-base rounded-lg bg-white border border-slate-100 cursor-pointer shadow-sm';
+                    cell.dataset.row = r; cell.dataset.col = c;
+                    cell.id = `cell-${r}-${c}`;
+                    cell.innerText = grid[r][c];
+                    cell.addEventListener('mousedown', startSel);
+                    cell.addEventListener('mouseenter', moveSel);
+                    cell.addEventListener('touchstart', (e) => { e.preventDefault(); startSel({target: e.target.closest('.cell')}); });
+                    cell.addEventListener('touchmove', (e) => {
+                        e.preventDefault();
+                        const t = document.elementFromPoint(e.touches[0].clientX, e.touches[0].clientY);
+                        if(t && t.closest('.cell')) moveSel({target: t.closest('.cell')});
+                    });
+                    gridEl.appendChild(cell);
+                }
+            }
+            window.addEventListener('mouseup', endSel);
+            window.addEventListener('touchend', endSel);
+            renderWords();
+        }
+
+        function canPlace(word, r, c, dr, dc) {
+            for(let i=0; i<word.length; i++) {
+                const nr = r+i*dr, nc = c+i*dc;
+                if (nr<0 || nr>=gridSize || nc<0 || nc>=gridSize || (grid[nr][nc] && grid[nr][nc] !== word[i])) return false;
+            }
+            return true;
+        }
+
+        function revealWord() {
+            if (isPaused) return;
+            const notFound = currentWords.filter(w => !foundWords.find(f => f.word === w));
+            if (notFound.length === 0) return;
+            const wordToReveal = notFound[Math.floor(Math.random() * notFound.length)];
+            const placement = wordPlacements.find(p => p.word === wordToReveal);
+            if (placement) {
+                const idx = foundWords.length;
+                foundWords.push({word: wordToReveal, idx, time: getGameTime()}); 
+                for (let i = 0; i < wordToReveal.length; i++) {
+                    const r = placement.r + i * placement.dr;
+                    const c = placement.c + i * placement.dc;
+                    const cell = document.getElementById(`cell-${r}-${c}`);
+                    if (cell) cell.classList.add('found-bg-' + (idx % 8), 'found-text');
+                }
+                playSound('success');
+                renderWords();
+                checkWin();
+            }
+        }
+
+        function giveHint() {
+            if (isPaused) return;
+            const notFound = currentWords.filter(w => !foundWords.find(f => f.word === w));
+            if (notFound.length === 0) return;
+            const wordToHint = notFound[0];
+            const placement = wordPlacements.find(p => p.word === wordToHint);
+            if (placement) {
+                const cell = document.getElementById(`cell-${placement.r}-${placement.c}`);
+                if (cell) {
+                    cell.classList.add('cell-selected');
+                    setTimeout(() => cell.classList.remove('cell-selected'), 1000);
+                }
+            }
+        }
+
+        function renderWords() {
+            const list = document.getElementById('word-list');
+            if (!list) return;
+            list.innerHTML = '';
+            
+            const displayList = [...currentWords].sort((a, b) => {
+                const aFound = foundWords.find(f => f.word === a);
+                const bFound = foundWords.find(f => f.word === b);
+                if (aFound && !bFound) return 1;
+                if (!aFound && bFound) return -1;
+                return 0;
+            });
+
+            displayList.forEach(word => {
+                const f = foundWords.find(x => x.word === word);
+                const item = document.createElement('div');
+                item.className = `word-item px-4 py-2.5 rounded-2xl font-bold text-xs transition-all ${f ? 'word-found' : 'bg-white text-slate-700 shadow-sm'}`;
+                
+                // Background fill element
+                const fill = document.createElement('div');
+                fill.className = `word-fill-bg ${f ? 'found-bg-' + (f.idx % 8) : ''}`;
+                item.appendChild(fill);
+
+                // Content wrapper
+                const content = document.createElement('div');
+                content.className = 'word-text-content';
+
+                const wordLabel = document.createElement('span');
+                wordLabel.className = `word-label ${f ? 'found-text' : ''}`;
+                wordLabel.innerText = word;
+                content.appendChild(wordLabel);
+
+                if (f) {
+                    const check = document.createElement('div');
+                    check.className = `w-5 h-5 rounded-full flex items-center justify-center bg-white/20 check-anim`;
+                    check.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+                    content.appendChild(check);
+                }
+
+                item.appendChild(content);
+                list.appendChild(item);
+            });
+            const prog = document.getElementById('progress-text');
+            if (prog) prog.innerText = `${foundWords.length}/${currentWords.length}`;
+        }
+
+        function startSel(e) { if (isPaused) return; isSelecting = true; const t = e.target.closest('.cell'); if (!t) return; startCell = { r: parseInt(t.dataset.row), c: parseInt(t.dataset.col) }; clearSel(); t.classList.add('cell-selected'); }
+        function moveSel(e) { if (!isSelecting || isPaused) return; const t = e.target.closest('.cell'); if (!t) return; const r2 = parseInt(t.dataset.row), c2 = parseInt(t.dataset.col); const dr = r2 - startCell.r, dc = c2 - startCell.c; if (dr !== 0 && dc !== 0 && Math.abs(dr) !== Math.abs(dc)) return; clearSel(); const steps = Math.max(Math.abs(dr), Math.abs(dc)); const sr = dr === 0 ? 0 : dr/Math.abs(dr), sc = dc === 0 ? 0 : dc/Math.abs(dc); for(let i=0; i<=steps; i++) { const cell = document.querySelector(`[data-row="${startCell.r+i*sr}"][data-col="${startCell.c+i*sc}"]`); if(cell) cell.classList.add('cell-selected'); } }
+        function endSel() { if (!isSelecting || isPaused) return; isSelecting = false; const sels = document.querySelectorAll('.cell-selected'); let w = ""; sels.forEach(el => w += el.innerText); const rev = w.split('').reverse().join(''); const match = [w, rev].find(x => currentWords.includes(x) && !foundWords.find(f => f.word === x)); if (match) { const idx = foundWords.length; foundWords.push({word: match, idx, time: getGameTime()}); playSound('success'); sels.forEach(el => el.classList.add('found-bg-'+(idx%8), 'found-text')); renderWords(); checkWin(); } clearSel(); }
+        function clearSel() { document.querySelectorAll('.cell-selected').forEach(el => el.classList.remove('cell-selected')); }
+        
+        function getGameTime() {
+            // Helper to get time elapsed regardless of count up/down
+            if(isCountdown) return (timeLimit - seconds);
+            return seconds;
+        }
+
+        function checkWin() {
+            if(foundWords.length === currentWords.length) {
+                clearInterval(timerInterval);
+                saveGameHistory(); // Save progress
+                setTimeout(showProgressReport, 500);
+            }
+        }
+
+        // --- NEW HISTORY FUNCTIONS ---
+
+        function initHistory() {
+            renderHistory();
+        }
+
+        function saveGameHistory() {
+            const titleEl = document.getElementById('puzzle-title');
+            const gameData = {
+                date: new Date().toLocaleDateString(),
+                time: document.getElementById('timer').innerText,
+                puzzle: titleEl ? titleEl.innerText : "Classic Random",
+                seconds: getGameTime() // for best time calc
+            };
+            
+            userHistory.unshift(gameData); // Add to top
+            if(userHistory.length > 50) userHistory.pop(); // Keep max 50 records
+            
+            localStorage.setItem('wordSearchHistory', JSON.stringify(userHistory));
+            renderHistory();
+        }
+
+        function renderHistory() {
+            // Stats
+            const totalGames = userHistory.length;
+            const totalWords = userHistory.reduce((acc, curr) => acc + 10, 0); // Approx 10 words per game for now
+            let bestTime = "-";
+            
+            if (totalGames > 0) {
+                const best = userHistory.reduce((min, p) => p.seconds < min.seconds ? p : min, userHistory[0]);
+                bestTime = best.time;
+            }
+
+            document.getElementById('hist-total-games').innerText = totalGames;
+            document.getElementById('hist-total-words').innerText = totalWords;
+            document.getElementById('hist-best-time').innerText = bestTime;
+
+            // Table
+            const tbody = document.getElementById('history-table-body');
+            tbody.innerHTML = '';
+            
+            if (totalGames === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="px-6 py-8 text-center text-slate-400 italic">No games played yet.</td></tr>`;
+                return;
+            }
+
+            userHistory.forEach(game => {
+                const row = document.createElement('tr');
+                row.className = "hover:bg-slate-50 transition-colors";
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap">${game.date}</td>
+                    <td class="px-6 py-4 font-bold text-slate-700">${game.puzzle}</td>
+                    <td class="px-6 py-4 font-mono text-blue-600">${game.time}</td>
+                    <td class="px-6 py-4"><span class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold uppercase">Won</span></td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function clearHistory() {
+            if(confirm("Are you sure you want to clear your game history?")) {
+                userHistory = [];
+                localStorage.removeItem('wordSearchHistory');
+                renderHistory();
+            }
+        }
+
+        // --- NEW GROUP PLAYER FUNCTIONS ---
+        
+        function selectPlayerCount(n) {
+            document.querySelectorAll('.player-card').forEach(el => el.classList.remove('selected'));
+            document.getElementById(`p-${n}`).classList.add('selected');
+        }
+
+        function generateGroupLink() {
+            // Use current timestamp as seed for unique room
+            const seed = Date.now();
+            const baseUrl = window.location.href.split('?')[0];
+            const inviteUrl = `${baseUrl}?room=${seed}`;
+            
+            const linkArea = document.getElementById('link-area');
+            const input = document.getElementById('share-url');
+            
+            input.value = inviteUrl;
+            linkArea.classList.remove('hidden');
+        }
+
+        function copyLink() {
+            const input = document.getElementById('share-url');
+            input.select();
+            document.execCommand('copy');
+            
+            const fb = document.getElementById('copy-feedback');
+            fb.innerText = "Link Copied! Send it to friends.";
+            setTimeout(() => fb.innerText = "", 3000);
+        }
+
+        function joinManualRoom() {
+            const code = document.getElementById('manual-room-code').value.trim();
+            if (code) {
+                // If code is full url
+                if (code.includes('?room=')) {
+                    window.location.href = code;
+                } else {
+                    // Assume code is the seed ID
+                    const baseUrl = window.location.href.split('?')[0];
+                    window.location.href = `${baseUrl}?room=${code}`;
+                }
+            }
+        }
+
+        // --- EXISTING UTILS ---
+
+        function showProgressReport() {
+            const reportModal = document.getElementById('report-modal');
+            const timeDisplay = document.getElementById('report-time');
+            const countDisplay = document.getElementById('report-word-count');
+            const countdownEl = document.getElementById('countdown-circle');
+            const chartContainer = document.getElementById('bar-chart-container');
+            const gauge = document.getElementById('gauge-progress');
+            const countdownArea = document.getElementById('countdown-area');
+            const actionButtons = document.getElementById('action-buttons');
+
+            countdownArea.classList.remove('hidden');
+            actionButtons.classList.add('hidden');
+            countdownEl.innerText = '5';
+
+            timeDisplay.innerText = document.getElementById('timer').innerText;
+            countDisplay.innerText = foundWords.length;
+            
+            // Generate Efficiency Graph based on Actual Speed
+            chartContainer.innerHTML = '';
+            
+            // Sort by time found to show progression
+            const sortedFound = [...foundWords].sort((a, b) => a.time - b.time);
+            
+            let prevTime = 0;
+            sortedFound.forEach((f, i) => {
+                const duration = f.time - prevTime;
+                prevTime = f.time;
+                
+                // Calculate "speed score" (shorter duration = higher bar)
+                // Normalize: 5 seconds = 100%, 30 seconds = 20%
+                let height = 100;
+                if(duration > 5) {
+                    height = Math.max(20, 100 - ((duration - 5) * 4)); 
+                }
+
+                // Bar Column
+                const col = document.createElement('div');
+                col.className = 'bar-col';
+                
+                // The Colored Bar
+                const bar = document.createElement('div');
+                bar.className = `bar-fill found-bg-${i % 8}`;
+                // Set height via JS to trigger transition
+                setTimeout(() => { bar.style.height = `${height}%`; }, i * 100 + 100);
+                
+                col.appendChild(bar);
+                chartContainer.appendChild(col);
+            });
+
+            const maxSeconds = 180; 
+            const progress = Math.min(getGameTime() / maxSeconds, 1);
+            const offset = 283 - (progress * 283);
+            gauge.style.setProperty('--offset', offset);
+            gauge.style.strokeDashoffset = offset;
+
+            reportModal.classList.remove('hidden');
+
+            let countdown = 5;
+            const interval = setInterval(() => {
+                countdown--;
+                if (countdownEl) countdownEl.innerText = countdown;
+                if (countdown <= 0) {
+                    clearInterval(interval);
+                    countdownArea.classList.add('hidden');
+                    actionButtons.classList.remove('hidden');
+                }
+            }, 1000);
+        }
+
+        function playSound(t) { 
+            try { 
+                const o = audioCtx.createOscillator();
+                const g = audioCtx.createGain(); 
+                o.type = 'sine'; 
+                o.connect(g); 
+                g.connect(audioCtx.destination); 
+                
+                if (t === 'success') {
+                    o.frequency.setValueAtTime(523.25, audioCtx.currentTime); 
+                    o.frequency.exponentialRampToValueAtTime(659.25, audioCtx.currentTime + 0.1);
+                    g.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                    g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+                } else if (t === 'fail') {
+                    // Descending low tone
+                    o.frequency.setValueAtTime(150, audioCtx.currentTime); 
+                    o.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.5);
+                    g.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                    g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+                } else {
+                    o.frequency.setValueAtTime(261.63, audioCtx.currentTime); 
+                    g.gain.setValueAtTime(0.05, audioCtx.currentTime);
+                    g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                }
+                
+                o.start(); 
+                o.stop(audioCtx.currentTime + 0.6); 
+            } catch(e) {} 
+        }
+
+        function togglePause() { isPaused = !isPaused; document.getElementById('grid-container').classList.toggle('is-paused', isPaused); isPaused ? clearInterval(timerInterval) : startTimer(true); }
+        
+        // Updated Switch Tab
+        function switchTab(t) { 
+            document.getElementById('view-play').classList.toggle('hidden', t !== 'play'); 
+            document.getElementById('view-make').classList.toggle('hidden', t !== 'make'); 
+            document.getElementById('view-history').classList.toggle('hidden', t !== 'history'); 
+            document.getElementById('view-group').classList.toggle('hidden', t !== 'group'); 
+            
+            document.getElementById('btn-play').className = t === 'play' ? 'px-3 py-2 rounded-lg font-bold transition-all text-blue-600 bg-blue-50' : 'px-3 py-2 rounded-lg font-bold transition-all text-slate-500 hover:bg-slate-100';
+            document.getElementById('btn-make').className = t === 'make' ? 'px-3 py-2 rounded-lg font-bold transition-all text-blue-600 bg-blue-50' : 'px-3 py-2 rounded-lg font-bold transition-all text-slate-500 hover:bg-slate-100';
+            document.getElementById('btn-history').className = t === 'history' ? 'px-3 py-2 rounded-lg font-bold transition-all text-blue-600 bg-blue-50' : 'px-3 py-2 rounded-lg font-bold transition-all text-slate-500 hover:bg-slate-100';
+            document.getElementById('btn-group').className = t === 'group' ? 'px-3 py-2 rounded-lg font-bold transition-all text-blue-600 bg-blue-50' : 'px-3 py-2 rounded-lg font-bold transition-all text-slate-500 hover:bg-slate-100';
+            
+            // Tab button styles for mobile
+            const tabs = ['play', 'group', 'make', 'history'];
+            tabs.forEach(tab => {
+                const btn = document.getElementById(`mb-${tab}`);
+                if(t === tab) {
+                    btn.classList.add('text-blue-600');
+                    btn.classList.remove('text-slate-400');
+                } else {
+                    btn.classList.remove('text-blue-600');
+                    btn.classList.add('text-slate-400');
+                }
+            });
+        }
+
+        function resetGame() { foundWords = []; seconds = 0; createGrid(); startTimer(); }
+        function closeModal() { document.getElementById('report-modal').classList.add('hidden'); }
+        
+        // Updated Random Words to use Seeded RNG
+        function getRandomWords(n) { 
+            return [...WORD_POOL].sort(() => 0.5 - myRandom()).slice(0, n); 
+        }
+        
+        function validateWordLimit(t) { 
+            const words = t.value.split('\n').filter(x => x.trim().length > 0);
+            const helper = document.getElementById('word-count-helper');
+            helper.innerText = `${words.length} / 12 WORDS`;
+            helper.className = words.length > 12 ? "text-right text-xs font-bold text-red-500 mt-2 px-2" : "text-right text-xs font-bold text-slate-400 mt-2 px-2";
+        }
+        function generateCustomPuzzle() { 
+            const t = document.getElementById('maker-title').value || "Custom"; 
+            const w = document.getElementById('maker-words').value.split('\n').map(x => x.trim().toUpperCase()).filter(x => x.length > 1).slice(0, 12); 
+            if(w.length > 0) { 
+                currentWords = w; 
+                gridSize = parseInt(document.getElementById('maker-size').value); 
+                const titleEl = document.getElementById('puzzle-title'); 
+                if (titleEl) titleEl.innerText = t; 
+                switchTab('play'); 
+                resetGame(); 
+            } 
+        }
+
+        // --- NEW PAYMENT & MODAL FUNCTIONS ---
+
+        function openPricingModal() {
+            // Reset to default state
+            price = 499;
+            const priceEl = document.getElementById('display-price');
+            priceEl.innerText = "₹499";
+            priceEl.classList.remove("text-green-500");
+            priceEl.classList.add("text-slate-900");
+            
+            // Set payment text
+            document.getElementById('payment-method-text').innerText = PAYMENT_GATEWAY;
+
+            document.getElementById('coupon-input').value = "";
+            document.getElementById('coupon-feedback').innerText = "";
+            document.getElementById('btn-text').innerText = "Pay Now";
+            document.getElementById('main-action-btn').classList.remove("bg-green-600", "hover:bg-green-700");
+            document.getElementById('main-action-btn').classList.add("bg-blue-600", "hover:bg-blue-700");
+            
+            // Show Modal
+            document.getElementById('pricing-modal').classList.remove('hidden');
+        }
+
+        function closePricingModal() {
+            document.getElementById('pricing-modal').classList.add('hidden');
+        }
+
+        function applyCoupon() {
+            // Note: Use 'coupon-input' here, which matches the HTML
+            const input = document.getElementById('coupon-input').value.trim();
+            const feedback = document.getElementById('coupon-feedback');
+            const priceEl = document.getElementById('display-price');
+            const btnText = document.getElementById('btn-text');
+            const mainBtn = document.getElementById('main-action-btn');
+
+            if (input.toUpperCase() === SECRET_COUPON) {
+                // Free Coupon Logic
+                price = 0;
+                priceEl.innerText = "FREE";
+                priceEl.classList.remove("text-slate-900");
+                priceEl.classList.add("text-green-500");
+                
+                feedback.innerText = "Valid Coupon! 100% OFF Applied.";
+                feedback.className = "h-4 text-center text-xs font-bold text-green-500 mt-2";
+                
+                btnText.innerText = "Download Now";
+                mainBtn.classList.remove("bg-blue-600", "hover:bg-blue-700");
+                mainBtn.classList.add("bg-green-600", "hover:bg-green-700");
+            
+            } else if (input === ADMIN_CODE) {
+                // SECRET ADMIN LOGIC (San123)
+                closePricingModal();
+                document.getElementById('admin-dashboard').classList.remove('hidden');
+            
+            } else {
+                // Invalid Logic
+                price = 499;
+                priceEl.innerText = "₹499";
+                priceEl.classList.remove("text-green-500");
+                priceEl.classList.add("text-slate-900");
+                
+                feedback.innerText = "Invalid Code.";
+                feedback.className = "h-4 text-center text-xs font-bold text-red-500 mt-2";
+                
+                btnText.innerText = "Pay Now";
+                mainBtn.classList.remove("bg-green-600", "hover:bg-green-700");
+                mainBtn.classList.add("bg-blue-600", "hover:bg-blue-700");
+            }
+        }
+
+        function processTransaction() {
+            const btn = document.getElementById('main-action-btn');
+            const originalText = document.getElementById('btn-text').innerText;
+            
+            // Simulate Processing
+            btn.innerHTML = `<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Processing...`;
+            btn.disabled = true;
+
+            setTimeout(() => {
+                // Success
+                btn.innerHTML = `<span id="btn-text">Success!</span>`;
+                btn.classList.remove("bg-blue-600", "bg-green-600");
+                btn.classList.add("bg-slate-800");
+                
+                setTimeout(() => {
+                    executeDownload();
+                    closePricingModal();
+                    // Reset button state
+                    btn.disabled = false;
+                }, 1000);
+            }, 2000);
+        }
+
+        function executeDownload() {
+            const blob = new Blob([document.documentElement.outerHTML], { type: 'text/html' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'word-search-pro-source.html';
+            a.click();
+        }
+        
+        // --- ADMIN FUNCTIONS ---
+        function closeAdmin() {
+            document.getElementById('admin-dashboard').classList.add('hidden');
+        }
+
+        function adminInstantWin() {
+            // Force game win state
+            if(foundWords.length < currentWords.length) {
+                // Fill all remaining words
+                currentWords.forEach(w => {
+                    if(!foundWords.find(f => f.word === w)) {
+                        const placement = wordPlacements.find(p => p.word === w);
+                        if(placement) {
+                             const idx = foundWords.length;
+                             foundWords.push({word: w, idx: idx, time: getGameTime()});
+                             for (let i = 0; i < w.length; i++) {
+                                const r = placement.r + i * placement.dr;
+                                const c = placement.c + i * placement.dc;
+                                const cell = document.getElementById(`cell-${r}-${c}`);
+                                if (cell) cell.classList.add('found-bg-' + (idx % 8), 'found-text');
+                            }
+                        }
+                    }
+                });
+                renderWords();
+                checkWin();
+                closeAdmin();
+            }
+        }
+
+        function adminRevealAll() {
+            // Just colorize everything without winning
+            currentWords.forEach((w, idx) => {
+                const placement = wordPlacements.find(p => p.word === w);
+                if(placement) {
+                     for (let i = 0; i < w.length; i++) {
+                        const r = placement.r + i * placement.dr;
+                        const c = placement.c + i * placement.dc;
+                        const cell = document.getElementById(`cell-${r}-${c}`);
+                        if (cell) cell.classList.add('found-bg-' + (idx % 8), 'found-text');
+                    }
+                }
+            });
+            closeAdmin();
+        }
+
+        function updatePaymentConfig() {
+            const name = document.getElementById('admin-gateway-name').value;
+            const key = document.getElementById('admin-gateway-key').value;
+            const feedback = document.getElementById('gateway-feedback');
+            
+            if(name) {
+                PAYMENT_GATEWAY = name;
+                GATEWAY_KEY = key;
+                feedback.innerText = "Config Updated Successfully!";
+                setTimeout(() => feedback.innerText = "", 2000);
+            }
+        }
+
+        function updateAdminPassword() {
+            const newPass = document.getElementById('admin-new-pass').value.trim();
+            const feedback = document.getElementById('pass-feedback');
+            
+            if(newPass.length > 3) {
+                ADMIN_CODE = newPass;
+                feedback.innerText = "Password Changed!";
+                setTimeout(() => feedback.innerText = "", 2000);
+            } else {
+                feedback.innerText = "Too Short (Min 4 chars)";
+                feedback.className = "text-center text-xs font-bold h-4 text-red-500";
+                setTimeout(() => {
+                    feedback.innerText = "";
+                    feedback.className = "text-center text-xs font-bold h-4 text-green-500";
+                }, 2000);
+            }
+        }
+
+        window.onload = init;
+    </script>
+
+</body></html>
